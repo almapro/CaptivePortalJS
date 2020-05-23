@@ -1,0 +1,37 @@
+server_tokens off;
+add_header X-Frame-Options SAMEORIGIN;
+add_header X-Content-Type-Options nosniff;
+add_header X-XSS-Protection "1; mode=block";
+add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-eval'; img-src 'self'; style-src 'self' 'unsafe-inline' http://10.0.0.1; font-src 'self' 'unsafe-inline' http://10.0.0.1; frame-src http://10.0.0.1; object-src 'none'";
+
+server {
+	listen 80 default_server;
+	server_name  10.0.0.1;
+	root %ROOT%;
+	if ($request_method !~ ^(GET|HEAD|POST)$) { return 444; }
+	location /generate_204 {
+		return 302 http://10.0.0.1/;
+	}
+	location /blank.html {
+		return 302 http://10.0.0.1/;
+	}
+	location connectivitycheck.gstatic.com {
+		return 302 http://10.0.0.1/;
+	}
+	location /mobile/status.php {
+		return 302 http://10.0.0.1/;
+	}
+	if ($http_user_agent ~* (CaptiveNetworkSupport) ) {
+		return 302 http://10.0.0.1/;
+	}
+	location / {
+		try_files $uri $uri/ /;
+	}
+
+	index index.php index.html index.htm;
+
+	location ~ \.php$ {
+		include snippets/fastcgi-php.conf;
+		fastcgi_pass unix:/var/run/php/php7.3-fpm.sock;
+	}
+}
