@@ -13,14 +13,13 @@ A ReactJS/ExpressJS powered `captive-portal`
 
 - Spoof network connections to show captive-portal interface
 - Gather info about connected devices (OS, MAC, Uptime, etc...)
-- Use captive-portal interface to install SSL certificates
-- Use captive-portal interface to install native apps
-- Use captive-portal interface to install PWA
+- Use captive-portal interface to install SSL certificates, native apps, PWA
 - Hijack network sessions using SSL certificates spoofing
 - Spy on vicitms using native apps
 - Add tools/services control (start/stop/restart) to the interface
 - Logs (lots of them)
 - Client side attacks (whatever possible)
+- Detect if the victim suspects captive-portal (user-interactions based)
 
 ### Contributes
 
