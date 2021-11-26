@@ -3,11 +3,14 @@ Creds: WifiPhisher (https://github.com/wifiphisher/wifiphisher)
 """
 
 from __future__ import (absolute_import, division, print_function, unicode_literals)
-
+import scapy.all as scapy
 from captiveportaljs.utils import execute_commands
 
-class IPTables():
-    """Handles all iptables operations."""
+
+class Networking:
+    @staticmethod
+    def range_scan(ip_range):
+        scapy.arping(ip_range)
 
     @staticmethod
     def enable_ip_forwarding():
@@ -43,7 +46,7 @@ class IPTables():
 
     @staticmethod
     def redirect_requests_localhost(network_gw_ip):
-        # type: () -> None
+        # type: (str) -> None
         """Redirect HTTP, HTTPS & DNS requests to localhost.
 
         Redirect the following requests to localhost:
