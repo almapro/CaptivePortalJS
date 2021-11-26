@@ -1,0 +1,24 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import sys
+
+try:
+    raw_input
+    sys.exit("Python 3.x is needed! Exiting...")
+except NameError:
+    pass
+
+import logging
+import os
+
+from captiveportaljs.runner import run
+
+root_logger = logging.getLogger()
+root_logger.addHandler(logging.NullHandler())
+
+dir_of_executable = os.path.dirname(__file__)
+path_to_project_root = os.path.abspath(os.path.join(dir_of_executable, '..'))
+sys.path.insert(0, path_to_project_root)
+os.chdir(path_to_project_root)
+run()
