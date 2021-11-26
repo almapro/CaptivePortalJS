@@ -21,7 +21,7 @@ class CleanCommand(Command):
     def finalize_options(self):
         pass
     def run(self):
-        os.system('rm -vrf ./build ./dist ./*.pyc ./*.tgz ./*.egg-info')
+        os.system('rm -vrf ./build ./dist ./**/__pycache__ ./**/*.pyc ./*.pyc ./*.tgz ./*.egg-info')
 
 setup(
     name="captiveportaljs",
