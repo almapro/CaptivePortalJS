@@ -7,4 +7,5 @@ try:
 except NameError:
     pass
 
-runner.run();
+if __name__ == '__main__':
+    runner.run();
