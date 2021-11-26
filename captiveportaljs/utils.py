@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, print_function, unicode_liter
 from logging import getLogger
 from subprocess import PIPE, Popen
 import os
+import sys
 
 # pylint: disable=C0103
 logger = getLogger(__name__)
@@ -19,3 +20,8 @@ def execute_commands(commands):
             logger.error(
                 "{command} has failed with the following error:\n{error}".
                 format(command=command, error=error))
+
+def check_sudo_mode():
+    """If the user doesn't run the program with super user privileges, don't allow them to continue."""
+    if not 'SUDO_UID' in os.environ.keys():
+        sys.exit("You need root privileges or sudo to use Captive Portal JS!")
