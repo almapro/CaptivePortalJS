@@ -10,7 +10,7 @@ from captiveportaljs.utils import execute_commands
 class Networking:
     @staticmethod
     def range_scan(ip_range):
-        scapy.arping(ip_range)
+        return scapy.arping(ip_range, verbose=0)
 
     @staticmethod
     def enable_ip_forwarding():

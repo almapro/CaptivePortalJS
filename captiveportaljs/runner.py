@@ -1,31 +1,105 @@
 import os
+import threading
 import curses
 from time import sleep
-from captiveportaljs.curseswrapper import CursesWrapper
+from typing import Callable
+from captiveportaljs.curseswindow import CursesWindow, GetOutOfLoop
 from captiveportaljs.networking import Networking
 from captiveportaljs.utils import check_sudo_mode
 
+def scanner_thread(devices_window, stop):
+    # type: (CursesWindow, Callable) -> None
+    devices = []
+    while True:
+        if stop():
+            break;
+        devices = []
+        devices_window.log.clear()
+        scan_result = Networking.range_scan('192.168.1.1/24')[0]
+        for result in scan_result:
+            devices.append('IP: {} MAC: {}'.format(result[1].psrc, result[1].hwsrc))
+        if not devices_window.help_shown:
+            devices_window.set_title('Devices on network ({})'.format(len(devices)))
+            devices_window.draw_window_borders()
+            devices_window.print_info(devices)
+        sleep(5)
+
+def curses_wrapper(screen):
+    # type: (curses._CursesWindow) -> curses._CursesWindow
+    curses.init_pair(1, curses.COLOR_GREEN, screen.getbkgd())
+    curses.init_pair(2, curses.COLOR_RED, screen.getbkgd())
+    curses.init_pair(3, curses.COLOR_YELLOW, screen.getbkgd())
+    curses.init_pair(4, curses.COLOR_CYAN, screen.getbkgd())
+    curses.init_pair(5, curses.COLOR_BLACK, curses.COLOR_YELLOW)
+    curses.cbreak()
+    curses.noecho()
+    screen.keypad(True)
+    screen.nodelay(True)
+    return screen
+
 def run():
-    wrapper = CursesWrapper()
+    check_sudo_mode()
+    screen = curses.wrapper(curses_wrapper)
+    max_screen_height, max_screen_width = screen.getmaxyx()
+    curses.noecho()
+    curses.curs_set(0)
+    main = CursesWindow(max_screen_height - 5, int(max_screen_width / 2), 0, 0, 'Main')
+    devices = CursesWindow(max_screen_height - 5, int(max_screen_width / 2), int(max_screen_width / 2), 0, 'Devices on network (0)')
+    messages = CursesWindow(5, max_screen_width, 0, max_screen_height - 5, 'Messages')
+    messages.set_focused(False)
+    devices.set_focused(False)
+    stop = False
+    messages.print_info(['Enabling IP forwarding...'])
+    Networking.enable_ip_forwarding()
+    messages.print_good(['Enabled'])
+    scanner = threading.Thread(target=scanner_thread, args=(devices, lambda: stop))
+    scanner.start()
     try:
-        check_sudo_mode()
-        wrapper.print(['Available Phishing Scenarios:'], curses.A_BOLD, wrapper.main_window)
-        wrapper.print_info(['Enabling IP forwarding...'])
-        Networking.enable_ip_forwarding()
-        wrapper.print_good(['Enabled'])
         counter = 1
-        while(True):
-            wrapper.print_good(['Sleeping {}...'.format(counter)], wrapper.main_window)
+        while True:
+            resized = curses.is_term_resized(max_screen_height, max_screen_width)
+            if resized:
+                max_screen_height, max_screen_width = screen.getmaxyx()
+                curses.resize_term(max_screen_height, max_screen_width)
+                main.resize_window(max_screen_height - 5, int(max_screen_width / 2), 0, 0)
+                devices.resize_window(max_screen_height - 5, int(max_screen_width / 2), int(max_screen_width / 2), 0)
+                messages.resize_window(5 , max_screen_width, 0, max_screen_height - 5)
+            main.print_good(['Here {}'.format(counter)])
             counter += 1
-            sleep(0.5)
-            key = wrapper.main_window.getch()
-            if key == ord('\n'): break;
+            sleep(0.3)
+            key = main.window.getch() if main.focused else messages.window.getch() if messages.focused else devices.window.getch()
+            if key == ord('\t'):
+                if main.focused:
+                    main.set_focused(False)
+                    devices.set_focused(True)
+                    main.display()
+                elif devices.focused:
+                    devices.set_focused(False)
+                    messages.set_focused(True)
+                    devices.display()
+                elif messages.focused:
+                    messages.set_focused(False)
+                    main.set_focused(True)
+                    messages.display()
+            if main.focused: main.handle_key(key)
+            if devices.focused: devices.handle_key(key)
+            if messages.focused: messages.handle_key(key)
+    except GetOutOfLoop:
+        messages.print_error(['Pressed exit key (q)', 'Exiting...'])
     except KeyboardInterrupt:
-        wrapper.print_error(['(^C) interrupted'])
+        messages.print_error(['(^C) interrupted'])
     except EOFError:
-        wrapper.print_error(['(^D) interrupted'])
-    wrapper.print_info(['Disabling IP forwarding...'])
+        messages.print_error(['(^D) interrupted'])
+    except Exception as e:
+        messages.print_error(['Unhandled error: {}'.format(str(e)), 'Exiting...'])
+        sleep(3)
+    stop = True
+    messages.print_info(['Stopping scanner thread...'])
+    scanner.join()
+    messages.print_info(['Stopped'])
+    messages.print_info(['Disabling IP forwarding...'])
     Networking.disable_ip_forwarding()
-    wrapper.print_good(['Disabled'])
-    curses.curs_set(True)
+    messages.print_info(['Disabled'])
+    curses.curs_set(1)
+    curses.endwin()
     os.system('clear')
