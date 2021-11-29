@@ -196,30 +196,30 @@ class CursesWindow:
         if key == curses.KEY_DOWN or key == curses.ACS_DARROW or key == ord('j'):
             if self.log_shown:
                 next_line = self.log_cursor + 1
-                if next_line == max_lines:
+                if next_line > max_lines:
                     if self.log_top + max_lines < len(self.log):
                         self.log_top += 1
-                    else:
-                        self.log_cursor = next_line
                 elif next_line < max_lines:
-                    if self.log_top + next_line < max_lines and len(self.log) > max_lines:
+                    if self.log_top + next_line < max_lines:
                         self.log_cursor = next_line
-                if self.log_cursor > max_lines or self.log_cursor > len(self.log) - 3:
-                    self.log_curor = min(len(self.log) - 3, max_lines)
-                if self.log_cursor == max_lines: self.log_scroll_enabled = True
+                else:
+                    self.log_cursor = next_line
+                if self.log_cursor > max_lines:
+                    self.log_cursor = min(len(self.log), max_lines)
+                if self.log_cursor == max_lines and self.log_top + max_lines == len(self.log): self.log_scroll_enabled = True
             else:
                 next_line = self.cursor + 1
-                if next_line == max_lines:
+                if next_line > max_lines:
                     if self.top + max_lines < len(self.entries):
                         self.top += 1
-                    else:
-                        self.cursor = next_line
                 elif next_line < max_lines:
-                    if self.top + next_line < max_lines and len(self.entries) > max_lines:
+                    if self.top + next_line < max_lines:
                         self.cursor = next_line
-                if self.cursor > max_lines or self.cursor > len(self.entries) - 3:
-                    self.curor = min(len(self.entries) - 3, max_lines)
-                if self.cursor == max_lines: self.scroll_enabled = True
+                else:
+                    self.cursor = next_line
+                if self.cursor > max_lines:
+                    self.cursor = min(len(self.entries), max_lines)
+                if self.cursor == max_lines and self.top + max_lines == len(self.entries): self.scroll_enabled = True
         if key == curses.KEY_NPAGE or key == ord('K'):
             if self.log_shown:
                 if self.log_cursor == 1:
