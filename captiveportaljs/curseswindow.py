@@ -38,6 +38,18 @@ class CursesWindow:
     def set_log_shown(self, log_shown):
         self.log_shown = log_shown
 
+    def clear_entries(self):
+        self.top = 0
+        self.cursor = 0
+        self.scroll_enabled = True
+        self.entries.clear()
+
+    def clear_log(self):
+        self.log_top = 0
+        self.log_cursor = 0
+        self.log_scroll_enabled = True
+        self.log.clear()
+
     def resize_window(self, height, width, x, y):
         # type: (int, int, int, int) -> None
         try:
@@ -183,7 +195,10 @@ class CursesWindow:
         if key == ord('?'):
             threading.Thread(target=self.show_help).start()
         if key == ord('q'):
-            raise GetOutOfLoop
+            if self.log_shown:
+                self.set_log_shown(False)
+            else:
+                raise GetOutOfLoop
         if key == curses.KEY_UP or key == ord('k'):
             if self.log_shown:
                 if self.log_top > 0 and self.log_cursor == 1: self.log_top -= 1
