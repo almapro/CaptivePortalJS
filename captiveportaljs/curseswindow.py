@@ -1,19 +1,20 @@
-import curses
+import curses, curses.panel
 import threading
 
 class GetOutOfLoop(Exception):
-    pass
+    def __init__(self, message):
+        self.message = message
+        pass
 
 class CursesWindow:
-    def __init__(self, height, width, x, y, title):
-        # type: (int, int, int, int, str) -> None
+    def __init__(self, window, panel, title, maximized_window, maximized_panel):
+        # type: (curses._CursesWindow, curses.panel._Curses_Panel, str, curses._CursesWindow, curses.panel._Curses_Panel) -> None
         self.title = title
         self.help_shown = False
-        self.window = curses.newwin(height, width, y, x)
-        self.window.nodelay(True)
-        self.window.notimeout(True)
-        self.window.immedok(True)
-        self.window.keypad(True)
+        self.window = window
+        self.maximized_window = maximized_window
+        self.maximized_panel = maximized_panel
+        self.panel = panel
         self.focused = True
         self.entries = []
         self.top = 0
@@ -24,11 +25,13 @@ class CursesWindow:
         self.log_cursor = 0
         self.log_scroll_enabled = True
         self.log_shown = False
+        self.maximized = False
         self.draw_window_borders()
 
     def set_title(self, title):
         # type: (str) -> None
         self.title = title
+        self.display()
 
     def set_focused(self, focused):
         # type: (bool) -> None
@@ -37,25 +40,31 @@ class CursesWindow:
 
     def set_log_shown(self, log_shown):
         self.log_shown = log_shown
+        self.display()
+
+    def set_maximized(self, maximized):
+        self.maximized = maximized
+        if maximized:
+            self.panel.bottom()
+        else:
+            self.panel.top()
 
     def clear_entries(self):
         self.top = 0
         self.cursor = 0
         self.scroll_enabled = True
         self.entries.clear()
+        self.display()
 
     def clear_log(self):
         self.log_top = 0
         self.log_cursor = 0
         self.log_scroll_enabled = True
         self.log.clear()
+        self.display()
 
-    def resize_window(self, height, width, x, y):
-        # type: (int, int, int, int) -> None
-        try:
-            self.window.mvwin(y, x)
-        except:
-            pass
+    def resize_window(self, height, width):
+        # type: (int, int) -> None
         self.window.resize(height, width)
         self.window.redrawwin()
         self.window.refresh()
@@ -64,17 +73,16 @@ class CursesWindow:
 
     def draw_window_borders(self):
         if self.help_shown: return
-        self.window.clear()
-        self.window.border()
-        self.window.move(0, 1)
-        self.window.move(0, int(self.window.getmaxyx()[1] / 2) - int(len(' {} '.format(self.title)) / 2))
-        if self.log_shown:
-            self.window.addstr(' LOG ({}) '.format(len(self.log)), curses.A_BOLD if self.focused else curses.A_NORMAL)
-        else:
-            self.window.addstr(' {} '.format(self.title), curses.A_BOLD if self.focused else curses.A_NORMAL)
-        self.window.refresh()
+        window = self.maximized_window if self.maximized else self.window
+        window.clear()
+        window.box()
+        title = ' LOG ({}) '.format(len(self.log)) if self.log_shown else ' {} '.format(self.title)
+        window.move(0, int(window.getmaxyx()[1] / 2) - int(len(title) / 2))
+        window.addstr(title, curses.A_BOLD if self.focused else curses.A_NORMAL)
+        window.refresh()
 
     def display(self):
+        if curses.panel.top_panel() == self.maximized_panel and not self.focused: return
         if self.log_shown:
             self.display_log()
         else:
@@ -84,8 +92,9 @@ class CursesWindow:
         if self.help_shown: return
         if not self.log_shown: return
         self.draw_window_borders()
-        max_height = self.window.getmaxyx()[0] - 2
-        max_width = self.window.getmaxyx()[1] - 2
+        window = self.maximized_window if self.maximized else self.window
+        max_height = window.getmaxyx()[0] - 2
+        max_width = window.getmaxyx()[1] - 2
         log = self.log[self.log_top:self.log_top + max_height]
         for idx, item in enumerate(log):
             text, color_pair = item
@@ -98,8 +107,9 @@ class CursesWindow:
         if self.help_shown: return
         if self.log_shown: return
         self.draw_window_borders()
-        max_height = self.window.getmaxyx()[0] - 2
-        max_width = self.window.getmaxyx()[1] - 2
+        window = self.maximized_window if self.maximized else self.window
+        max_height = window.getmaxyx()[0] - 2
+        max_width = window.getmaxyx()[1] - 2
         entries = self.entries[self.top:self.top + max_height]
         for idx, item in enumerate(entries):
             text, color_pair = item
@@ -110,13 +120,15 @@ class CursesWindow:
 
     def print_to_window(self, text, color_pair, line):
         # type: (str, int, int) -> None
-        self.window.move(line, 1)
-        self.window.addstr(self.display_string(self.window.getmaxyx()[1] - 2, text), color_pair)
-        self.window.refresh()
+        window = self.maximized_window if self.maximized else self.window
+        window.move(line, 1)
+        window.addstr(self.display_string(window.getmaxyx()[1] - 2, text), color_pair)
+        window.refresh()
 
     def print_raw(self, texts, color_pair):
         # type: (list[str], int) -> None
-        max_lines = self.window.getmaxyx()[0] - 2
+        window = self.maximized_window if self.maximized else self.window
+        max_lines = window.getmaxyx()[0] - 2
         for text in texts:
             self.entries.append([text, color_pair])
             if self.scroll_enabled:
@@ -148,7 +160,8 @@ class CursesWindow:
 
     def log_raw(self, texts, color_pair):
         # type: (list[str], int) -> None
-        max_lines = self.window.getmaxyx()[0] - 2
+        window = self.maximized_window if self.maximized else self.window
+        max_lines = window.getmaxyx()[0] - 2
         for text in texts:
             self.log.append([text, color_pair])
             if self.log_scroll_enabled:
@@ -176,29 +189,31 @@ class CursesWindow:
 
     def show_help(self):
         self.help_shown = True
-        self.window.clear()
-        self.window.border()
-        self.window.move(0, int(self.window.getmaxyx()[1] / 2) - int(len(' Help ') / 2))
-        self.window.addstr(' Help ', curses.A_BOLD)
+        window = self.maximized_window if self.maximized else self.window
+        window.clear()
+        window.border()
+        window.move(0, int(window.getmaxyx()[1] / 2) - int(len(' Help ') / 2))
+        window.addstr(' Help ', curses.A_BOLD)
         while True:
-            self.window.move(1, 1)
-            self.window.addstr('Cursor: {}'.format(self.cursor), curses.A_BOLD)
-            key = self.window.getch()
+            window.move(1, 1)
+            window.addstr('Entries: {} Log: {}'.format(len(self.entries), len(self.log)), curses.A_BOLD)
+            key = window.getch()
             if key == ord('q') or key == ord('?') or key == 27: break
         self.help_shown = False
-        self.window.refresh()
+        self.display()
 
     def handle_key(self, key):
         # type: (int) -> None
         if key == -1: return
-        max_lines = self.window.getmaxyx()[0] - 2
+        window = self.maximized_window if self.maximized else self.window
+        max_lines = window.getmaxyx()[0] - 2
         if key == ord('?'):
             threading.Thread(target=self.show_help).start()
         if key == ord('q'):
             if self.log_shown:
                 self.set_log_shown(False)
             else:
-                raise GetOutOfLoop
+                raise GetOutOfLoop('')
         if key == curses.KEY_UP or key == ord('k'):
             if self.log_shown:
                 if self.log_top > 0 and self.log_cursor == 1: self.log_top -= 1
@@ -214,10 +229,7 @@ class CursesWindow:
                 if next_line > max_lines:
                     if self.log_top + max_lines < len(self.log):
                         self.log_top += 1
-                elif next_line < max_lines:
-                    if self.log_top + next_line < max_lines:
-                        self.log_cursor = next_line
-                else:
+                elif next_line <= max_lines:
                     self.log_cursor = next_line
                 if self.log_cursor > max_lines:
                     self.log_cursor = min(len(self.log), max_lines)
@@ -227,10 +239,7 @@ class CursesWindow:
                 if next_line > max_lines:
                     if self.top + max_lines < len(self.entries):
                         self.top += 1
-                elif next_line < max_lines:
-                    if self.top + next_line < max_lines:
-                        self.cursor = next_line
-                else:
+                elif next_line <= max_lines:
                     self.cursor = next_line
                 if self.cursor > max_lines:
                     self.cursor = min(len(self.entries), max_lines)

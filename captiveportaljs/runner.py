@@ -1,45 +1,11 @@
 import os
 import threading
-import curses
+import curses, curses.panel
 from time import sleep
-from typing import Callable
 from captiveportaljs.curseswindow import CursesWindow, GetOutOfLoop
 from captiveportaljs.networking import Networking
 from captiveportaljs.utils import check_sudo_mode
-
-def scanner_thread(devices_window, stop):
-    # type: (CursesWindow, Callable) -> None
-    devices = []
-    disconnected_devices = []
-    while True:
-        if stop():
-            break;
-        devices_window.entries.clear()
-        scan_result = Networking.range_scan('192.168.71.1/24')[0]
-        new_devices = []
-        for result in scan_result:
-            new_devices.append({ 'ip': result[1].psrc, 'mac': result[1].hwsrc })
-        reconnected_devices = [
-            device
-            for device in list(filter(lambda d: not d in new_devices, disconnected_devices))
-        ]
-        disconnected_devices = [
-            device
-            for device in list(filter(lambda d: not d in new_devices, devices))
-        ]
-        for device in new_devices:
-            if device in reconnected_devices:
-                devices_window.log_info(['Device ({}) reconnected with IP ({})'.format(device['mac'], device['ip'])])
-                devices_window.print_info(['IP: {} MAC: {} (reconnected)'.format(device['ip'], device['mac'])])
-            else:
-                devices_window.print_info(['IP: {} MAC: {}'.format(device['ip'], device['mac'])])
-        for device in disconnected_devices:
-            devices_window.log_info(['Device ({}) disconnected'.format(device['mac'])])
-            devices_window.print_error(['IP: {} MAC: {} (disconnected)'.format(device['ip'], device['mac'])])
-        devices = new_devices + disconnected_devices
-        devices_window.set_title('Devices on network ({})'.format(len(devices)))
-        devices_window.display()
-        sleep(5)
+from captiveportaljs.wireless import Wireless, WirelessInterface
 
 def curses_wrapper(screen):
     # type: (curses._CursesWindow) -> curses._CursesWindow
@@ -54,23 +20,57 @@ def curses_wrapper(screen):
     screen.nodelay(True)
     return screen
 
+def create_window_with_panel(height, width, x, y):
+    window = curses.newwin(height, width, y, x)
+    window.scrollok(True)
+    window.nodelay(True)
+    window.notimeout(True)
+    window.immedok(True)
+    window.keypad(True)
+    panel = curses.panel.new_panel(window)
+    return window, panel
+
 def run():
     check_sudo_mode()
     screen = curses.wrapper(curses_wrapper)
     max_screen_height, max_screen_width = screen.getmaxyx()
     curses.noecho()
     curses.curs_set(0)
-    main = CursesWindow(max_screen_height - 5, int(max_screen_width / 2), 0, 0, 'Main')
-    devices = CursesWindow(max_screen_height - 5, int(max_screen_width / 2), int(max_screen_width / 2), 0, 'Devices on network (0)')
-    messages = CursesWindow(5, max_screen_width, 0, max_screen_height - 5, 'Messages')
+    maximized_window, maximized_panel = create_window_with_panel(max_screen_height, max_screen_width, 0, 0)
+    maximized_panel.bottom()
+    curses.panel.update_panels()
+    screen.refresh()
+    main_window, main_panel = create_window_with_panel(max_screen_height - 5, int(max_screen_width / 2), 0, 0)
+    main = CursesWindow(main_window, main_panel, 'Main', maximized_window, maximized_panel)
+    devices_window, devices_panel = create_window_with_panel(max_screen_height - 5, int(max_screen_width / 2), int(max_screen_width / 2), 0)
+    devices = CursesWindow(devices_window, devices_panel, 'Devices on network (0)', maximized_window, maximized_panel)
+    messages_window, messages_panel = create_window_with_panel(5, max_screen_width, 0, max_screen_height - 5)
+    messages = CursesWindow(messages_window, messages_panel, 'Messages', maximized_window, maximized_panel)
     messages.set_focused(False)
     devices.set_focused(False)
     stop = False
-    messages.print_info(['Enabling IP forwarding...'])
-    Networking.enable_ip_forwarding()
-    messages.print_good(['Enabled'])
-    scanner = threading.Thread(target=scanner_thread, args=(devices, lambda: stop))
-    scanner.start()
+    maximized_view = False
+    active_networking_interface = Networking.get_active_interface()
+    wireless_interfaces = Wireless.get_interfaces()
+    networking_scanner = None # type: threading.Thread | None
+    wireless_scanner = None # type: threading.Thread | None
+    if active_networking_interface:
+        messages.print_info(['Enabling IP forwarding...'])
+        Networking.enable_ip_forwarding()
+        messages.print_good(['Enabled'])
+        messages.print_info(['Starting networking scanner thread...'])
+        networking_scanner = threading.Thread(target=Networking.scanner_thread, args=(devices, active_networking_interface, lambda: stop))
+        networking_scanner.start()
+        messages.print_good(['Started'])
+        if active_networking_interface in wireless_interfaces:
+            wireless_interfaces.remove(active_networking_interface)
+    if len(wireless_interfaces) > 0:
+        messages.print_info(['Starting wireless scanner thread...'])
+        wireless_card = Wireless.get_interface_info(wireless_interfaces[0])
+        wireless_interface = WirelessInterface(wireless_card)
+        wireless_scanner = threading.Thread(target=Wireless.scanner_thread, args=(main, wireless_interface, lambda: stop))
+        wireless_scanner.start()
+        messages.print_good(['Started'])
     try:
         counter = 1
         while True:
@@ -78,30 +78,50 @@ def run():
             if resized:
                 max_screen_height, max_screen_width = screen.getmaxyx()
                 curses.resize_term(max_screen_height, max_screen_width)
-                main.resize_window(max_screen_height - 5, int(max_screen_width / 2), 0, 0)
-                devices.resize_window(max_screen_height - 5, int(max_screen_width / 2), int(max_screen_width / 2), 0)
-                messages.resize_window(5 , max_screen_width, 0, max_screen_height - 5)
+                main.resize_window(max_screen_height - 5, int(max_screen_width / 2))
+                devices.resize_window(max_screen_height - 5, int(max_screen_width / 2))
+                messages.resize_window(5 , max_screen_width)
+                maximized_window.resize(max_screen_height, max_screen_width)
+                screen.refresh()
             main.log_good(['Here {}'.format(counter)])
             counter += 1
             sleep(0.3)
-            key = main.window.getch() if main.focused else messages.window.getch() if messages.focused else devices.window.getch()
+            key = maximized_window.getch() if maximized_view else main.window.getch() if main.focused else messages.window.getch() if messages.focused else devices.window.getch()
             if key == ord('\t'):
-                if main.focused:
+                if main.focused and not main.maximized:
                     main.set_focused(False)
                     devices.set_focused(True)
                     main.display()
-                elif devices.focused:
+                elif devices.focused and not devices.maximized:
                     devices.set_focused(False)
                     messages.set_focused(True)
                     devices.display()
-                elif messages.focused:
+                elif messages.focused and not messages.maximized:
                     messages.set_focused(False)
                     main.set_focused(True)
                     messages.display()
+            if key == ord('m'):
+                if not maximized_view:
+                    maximized_view = True
+                    if main.focused: main.set_maximized(True)
+                    if devices.focused: devices.set_maximized(True)
+                    if messages.focused: messages.set_maximized(True)
+                    maximized_panel.top()
+                else:
+                    maximized_view = False
+                    if main.focused: main.set_maximized(False)
+                    if devices.focused: devices.set_maximized(False)
+                    if messages.focused: messages.set_maximized(False)
+                    maximized_window.clear()
+                    maximized_panel.bottom()
+                curses.panel.update_panels()
+                screen.refresh()
             if main.focused: main.handle_key(key)
             if devices.focused: devices.handle_key(key)
             if messages.focused: messages.handle_key(key)
-    except GetOutOfLoop:
+    except GetOutOfLoop as r:
+        if r.message != '':
+            messages.print_error([r.message])
         messages.print_error(['Pressed exit key (q)', 'Exiting...'])
     except KeyboardInterrupt:
         messages.print_error(['(^C) interrupted'])
@@ -111,12 +131,17 @@ def run():
         messages.print_error(['Unhandled error: {}'.format(str(e)), 'Exiting...'])
         sleep(3)
     stop = True
-    messages.print_info(['Stopping scanner thread...'])
-    scanner.join()
-    messages.print_info(['Stopped'])
-    messages.print_info(['Disabling IP forwarding...'])
-    Networking.disable_ip_forwarding()
-    messages.print_info(['Disabled'])
+    if networking_scanner:
+        messages.print_info(['Stopping networking scanner thread...'])
+        networking_scanner.join()
+        messages.print_info(['Stopped'])
+        messages.print_info(['Disabling IP forwarding...'])
+        Networking.disable_ip_forwarding()
+        messages.print_info(['Disabled'])
+    if wireless_scanner:
+        messages.print_info(['Stopping wireless scanner thread...'])
+        wireless_scanner.join()
+        messages.print_info(['Stopped'])
     curses.curs_set(1)
     curses.endwin()
     os.system('clear')
