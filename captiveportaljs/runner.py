@@ -3,7 +3,7 @@ import threading
 import curses, curses.panel
 from time import sleep
 from captiveportaljs.curseswindow import CursesWindow, GetOutOfLoop
-from captiveportaljs.networking import Networking
+from captiveportaljs.networking import Network
 from captiveportaljs.utils import check_sudo_mode
 from captiveportaljs.wireless import Wireless, WirelessInterface
 
@@ -51,16 +51,16 @@ def run():
     devices.set_focused(False)
     stop = False
     maximized_view = False
-    active_networking_interface = Networking.get_active_interface()
+    active_networking_interface = Network.get_active_interface()
     wireless_interfaces = Wireless.get_interfaces()
     networking_scanner = None # type: threading.Thread | None
     wireless_scanner = None # type: threading.Thread | None
     if active_networking_interface:
         messages.print_info(['Enabling IP forwarding...'])
-        Networking.enable_ip_forwarding()
+        Network.enable_ip_forwarding()
         messages.print_good(['Enabled'])
         messages.print_info(['Starting networking scanner thread...'])
-        networking_scanner = threading.Thread(target=Networking.scanner_thread, args=(devices, active_networking_interface, lambda: stop))
+        networking_scanner = threading.Thread(target=Network.scanner_thread, args=(devices, active_networking_interface, lambda: stop))
         networking_scanner.start()
         messages.print_good(['Started'])
         if active_networking_interface in wireless_interfaces:
@@ -137,7 +137,7 @@ def run():
         networking_scanner.join()
         messages.print_info(['Stopped'])
         messages.print_info(['Disabling IP forwarding...'])
-        Networking.disable_ip_forwarding()
+        Network.disable_ip_forwarding()
         messages.print_info(['Disabled'])
     if wireless_scanner:
         messages.print_info(['Stopping wireless scanner thread...'])

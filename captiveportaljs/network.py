@@ -10,7 +10,7 @@ from typing import Callable
 from captiveportaljs.utils import execute_commands
 from captiveportaljs.curseswindow import CursesWindow
 
-class Networking:
+class Network:
     @staticmethod
     def get_interfaces():
         # type: () -> list[str]
@@ -19,16 +19,16 @@ class Networking:
     @staticmethod
     def get_active_interface():
         # type: () -> str | None
-        interfaces = Networking.get_interfaces()
+        interfaces = Network.get_interfaces()
         for interface in interfaces:
-            gateway = Networking.get_interface_gateway(interface)
+            gateway = Network.get_interface_gateway(interface)
             if gateway != '': return interface
         return None
 
     @staticmethod
     def get_interface_gateway(interface):
         # type: (str) -> str
-        return Networking.get_interface_range(interface).split('/')[0]
+        return Network.get_interface_range(interface).split('/')[0]
 
     @staticmethod
     def get_interface_ip(interface):
@@ -63,13 +63,13 @@ class Networking:
         # type: (CursesWindow, str, Callable) -> None
         devices = []
         disconnected_devices = []
-        gateway = Networking.get_interface_gateway(interface)
-        range = Networking.get_interface_range(interface)
+        gateway = Network.get_interface_gateway(interface)
+        range = Network.get_interface_range(interface)
         while True:
             try:
                 if stop():
                     break;
-                scan_result = Networking.range_scan(range)[0]
+                scan_result = Network.range_scan(range)[0]
                 window.clear_entries()
                 new_devices = []
                 for result in scan_result:
