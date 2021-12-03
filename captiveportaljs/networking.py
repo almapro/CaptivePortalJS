@@ -69,8 +69,8 @@ class Networking:
             try:
                 if stop():
                     break;
-                window.entries.clear()
                 scan_result = Networking.range_scan(range)[0]
+                window.clear_entries()
                 new_devices = []
                 for result in scan_result:
                     new_devices.append({ 'ip': result[1].psrc, 'mac': result[1].hwsrc })
@@ -80,21 +80,23 @@ class Networking:
                 ]
                 disconnected_devices = [
                     device
-                    for device in list(filter(lambda d: not d in new_devices, devices))
+                    for device in list(filter(lambda d: not d in new_devices and d['ip'] != gateway, devices))
                 ]
                 for device in new_devices:
-                    router = ' (Router)' if device['ip'] == gateway else ''
+                    if not device in devices:
+                        devices.append(device)
+                for device in devices:
+                    if device in disconnected_devices: continue
+                    router = '(Router)' if device['ip'] == gateway else ''
                     if device in reconnected_devices:
                         window.log_info(['Device ({}) reconnected with IP ({})'.format(device['mac'], device['ip'])])
-                        window.print_info(['IP: {} MAC: {} (reconnected){}'.format(device['ip'], device['mac'], router)])
+                        window.print_info(['{} {} (reconnected) {}'.format(device['ip'], device['mac'], router)])
                     else:
                         window.log_info(['Device ({}) connected with IP ({})'.format(device['mac'], device['ip'])])
-                        window.print_info(['IP: {} MAC: {}{}'.format(device['ip'], device['mac'], router)])
+                        window.print_info(['{} {} {}'.format(device['ip'], device['mac'], router)])
                 for device in disconnected_devices:
-                    router = ' (Router)' if device['ip'] == gateway else ''
                     window.log_info(['Device ({}) disconnected'.format(device['mac'])])
-                    window.print_error(['IP: {} MAC: {} (disconnected){}'.format(device['ip'], device['mac'], router)])
-                devices = new_devices + disconnected_devices
+                    window.print_error(['{} {} (disconnected)'.format(device['ip'], device['mac'])])
                 window.set_title('Devices on network ({})'.format(len(devices)))
                 window.display()
                 sleep(3)

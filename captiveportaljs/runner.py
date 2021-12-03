@@ -23,6 +23,8 @@ def curses_wrapper(screen):
 
 def create_window_with_panel(height, width, x, y):
     window = curses.newwin(height, width, y, x)
+    curses.cbreak()
+    curses.noecho()
     window.scrollok(True)
     window.nodelay(True)
     window.notimeout(True)
@@ -40,11 +42,11 @@ def run():
     curses.panel.update_panels()
     screen.refresh()
     main_window, main_panel = create_window_with_panel(max_screen_height - 5, int(max_screen_width / 2), 0, 0)
-    main = CursesWindow(main_window, main_panel, 'Main', maximized_window, maximized_panel)
+    main = CursesWindow(main_window, main_panel, 'Main', ['Hi'], maximized_window, maximized_panel)
     devices_window, devices_panel = create_window_with_panel(max_screen_height - 5, int(max_screen_width / 2), int(max_screen_width / 2), 0)
-    devices = CursesWindow(devices_window, devices_panel, 'Devices on network (0)', maximized_window, maximized_panel)
+    devices = CursesWindow(devices_window, devices_panel, 'Devices on network (0)', ['IP{}MAC{}INFO'.format(''.ljust(13), ''.ljust(15))], maximized_window, maximized_panel)
     messages_window, messages_panel = create_window_with_panel(5, max_screen_width, 0, max_screen_height - 5)
-    messages = CursesWindow(messages_window, messages_panel, 'Messages', maximized_window, maximized_panel)
+    messages = CursesWindow(messages_window, messages_panel, 'Messages', [], maximized_window, maximized_panel)
     messages.set_focused(False)
     devices.set_focused(False)
     stop = False

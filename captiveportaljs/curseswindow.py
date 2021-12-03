@@ -7,9 +7,10 @@ class GetOutOfLoop(Exception):
         pass
 
 class CursesWindow:
-    def __init__(self, window, panel, title, maximized_window, maximized_panel):
-        # type: (curses._CursesWindow, curses.panel._Curses_Panel, str, curses._CursesWindow, curses.panel._Curses_Panel) -> None
+    def __init__(self, window, panel, title, headers, maximized_window, maximized_panel):
+        # type: (curses._CursesWindow, curses.panel._Curses_Panel, str, list[str], curses._CursesWindow, curses.panel._Curses_Panel) -> None
         self.title = title
+        self.headers = headers
         self.help_shown = False
         self.window = window
         self.maximized_window = maximized_window
@@ -18,7 +19,7 @@ class CursesWindow:
         self.focused = True
         self.entries = []
         self.top = 0
-        self.cursor = 0
+        self.cursor = 0 + len(self.headers)
         self.scroll_enabled = True
         self.log = []
         self.log_top = 0
@@ -51,7 +52,7 @@ class CursesWindow:
 
     def clear_entries(self):
         self.top = 0
-        self.cursor = 0
+        self.cursor = 0 + len(self.headers)
         self.scroll_enabled = True
         self.entries.clear()
         self.display()
@@ -110,13 +111,15 @@ class CursesWindow:
         window = self.maximized_window if self.maximized else self.window
         max_height = window.getmaxyx()[0] - 2
         max_width = window.getmaxyx()[1] - 2
-        entries = self.entries[self.top:self.top + max_height]
+        for idx, header in enumerate(self.headers):
+           self.print_to_window(header, curses.A_NORMAL, idx + 1)
+        entries = self.entries[self.top:self.top + max_height - len(self.headers)]
         for idx, item in enumerate(entries):
             text, color_pair = item
-            if idx + 1 == self.cursor and self.focused:
-                self.print_to_window(text.ljust(max_width), curses.color_pair(5), idx + 1)
+            if idx + 1 + len(self.headers) == self.cursor and self.focused:
+                self.print_to_window(text.ljust(max_width), curses.color_pair(5), idx + 1 + len(self.headers))
             else:
-                self.print_to_window(text, color_pair, idx + 1)
+                self.print_to_window(text, color_pair, idx + 1 + len(self.headers))
 
     def print_to_window(self, text, color_pair, line):
         # type: (str, int, int) -> None
@@ -207,6 +210,7 @@ class CursesWindow:
         if key == -1: return
         window = self.maximized_window if self.maximized else self.window
         max_lines = window.getmaxyx()[0] - 2
+        if self.log_shown: max_lines += len(self.headers)
         if key == ord('?'):
             threading.Thread(target=self.show_help).start()
         if key == ord('q'):
@@ -220,8 +224,8 @@ class CursesWindow:
                 elif self.log_top > 0 or self.log_cursor > 1: self.log_cursor -= 1
                 self.log_scroll_enabled = False
             else:
-                if self.top > 0 and self.cursor == 1: self.top -= 1
-                elif self.top > 0 or self.cursor > 1: self.cursor -= 1
+                if self.top > 0 and self.cursor == 1 + len(self.headers): self.top -= 1
+                elif self.top > 0 or self.cursor > 1 + len(self.headers): self.cursor -= 1
                 self.scroll_enabled = False
         if key == curses.KEY_DOWN or key == curses.ACS_DARROW or key == ord('j'):
             if self.log_shown:
@@ -251,9 +255,9 @@ class CursesWindow:
                 self.log_cursor = 1
                 self.log_scroll_enabled = False
             else:
-                if self.cursor == 1:
+                if self.cursor == 1 + len(self.headers):
                     self.top = max(0, self.top - max_lines)
-                self.cursor = 1
+                self.cursor = 1 + len(self.headers)
                 self.scroll_enabled = False
         if key == curses.KEY_PPAGE or key == ord('J'):
             if self.log_shown:
@@ -280,7 +284,7 @@ class CursesWindow:
                 self.log_top = 0
                 self.log_scroll_enabled = False
             else:
-                self.cursor = 1
+                self.cursor = 1 + len(self.headers)
                 self.top = 0
                 self.scroll_enabled = False
         if key == curses.KEY_END or key == ord('E'):
@@ -294,13 +298,9 @@ class CursesWindow:
                 self.scroll_enabled = True
         if key == curses.KEY_DC or key == ord('C'):
             if self.log_shown:
-                self.log = []
-                self.log_cursor = self.log_top = 0
-                self.log_scroll_enabled = True
+                self.clear_log()
             else:
-                self.entries = []
-                self.cursor = self.top = 0
-                self.scroll_enabled = True
+                self.clear_entries()
         if key == ord('L'):
             if self.log_shown:
                 self.set_log_shown(False)
