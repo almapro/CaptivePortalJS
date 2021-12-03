@@ -16,6 +16,7 @@ def curses_wrapper(screen):
     curses.init_pair(5, curses.COLOR_BLACK, curses.COLOR_YELLOW)
     curses.cbreak()
     curses.noecho()
+    curses.curs_set(0)
     screen.keypad(True)
     screen.nodelay(True)
     return screen
@@ -34,8 +35,6 @@ def run():
     check_sudo_mode()
     screen = curses.wrapper(curses_wrapper)
     max_screen_height, max_screen_width = screen.getmaxyx()
-    curses.noecho()
-    curses.curs_set(0)
     maximized_window, maximized_panel = create_window_with_panel(max_screen_height, max_screen_width, 0, 0)
     maximized_panel.bottom()
     curses.panel.update_panels()
@@ -144,4 +143,6 @@ def run():
         messages.print_info(['Stopped'])
     curses.curs_set(1)
     curses.endwin()
+    curses.reset_shell_mode()
+    curses.echo()
     os.system('clear')
