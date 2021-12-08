@@ -2,3 +2,4 @@ scapy
 ipaddress
 curses
 pyric
+urwid
