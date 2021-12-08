@@ -2,8 +2,9 @@ import os
 import threading
 import curses, curses.panel
 from time import sleep
-from captiveportaljs.curseswindow import CursesWindow, GetOutOfLoop
-from captiveportaljs.networking import Network
+from captiveportaljs.curseswindow import CursesWindow
+from captiveportaljs.errorclasses import CodeError, GetOutOfLoop
+from captiveportaljs.network import Network
 from captiveportaljs.utils import check_sudo_mode
 from captiveportaljs.wireless import Wireless, WirelessInterface
 
@@ -42,7 +43,8 @@ def run():
     curses.panel.update_panels()
     screen.refresh()
     main_window, main_panel = create_window_with_panel(max_screen_height - 5, int(max_screen_width / 2), 0, 0)
-    main = CursesWindow(main_window, main_panel, 'Main', ['Hi'], maximized_window, maximized_panel)
+    essid_width = main_window.getmaxyx()[1] - 2 - 19 - 5 - 13 - 5 - 4;
+    main = CursesWindow(main_window, main_panel, 'Main', ['{}{}{}{}{}WPS '.format('ESSID'.ljust(essid_width if essid_width > 0 else 6), 'BSSID'.ljust(19), 'CH   ', 'ENCRYPTION'.ljust(13), 'PWR'.ljust(5)), '    STATION'], maximized_window, maximized_panel)
     devices_window, devices_panel = create_window_with_panel(max_screen_height - 5, int(max_screen_width / 2), int(max_screen_width / 2), 0)
     devices = CursesWindow(devices_window, devices_panel, 'Devices on network (0)', ['IP{}MAC{}INFO'.format(''.ljust(13), ''.ljust(15))], maximized_window, maximized_panel)
     messages_window, messages_panel = create_window_with_panel(5, max_screen_width, 0, max_screen_height - 5)
@@ -73,56 +75,53 @@ def run():
         wireless_scanner.start()
         messages.print_good(['Started'])
     try:
-        counter = 1
         while True:
-            resized = curses.is_term_resized(max_screen_height, max_screen_width)
-            if resized:
-                max_screen_height, max_screen_width = screen.getmaxyx()
-                curses.resize_term(max_screen_height, max_screen_width)
-                main.resize_window(max_screen_height - 5, int(max_screen_width / 2))
-                devices.resize_window(max_screen_height - 5, int(max_screen_width / 2))
-                messages.resize_window(5 , max_screen_width)
-                maximized_window.resize(max_screen_height, max_screen_width)
-                screen.refresh()
-            main.log_good(['Here {}'.format(counter)])
-            counter += 1
-            sleep(0.3)
-            key = maximized_window.getch() if maximized_view else main.window.getch() if main.focused else messages.window.getch() if messages.focused else devices.window.getch()
-            if key == ord('\t'):
-                if main.focused and not main.maximized:
-                    main.set_focused(False)
-                    devices.set_focused(True)
-                    main.display()
-                elif devices.focused and not devices.maximized:
-                    devices.set_focused(False)
-                    messages.set_focused(True)
-                    devices.display()
-                elif messages.focused and not messages.maximized:
-                    messages.set_focused(False)
-                    main.set_focused(True)
-                    messages.display()
-            if key == ord('m'):
-                if not maximized_view:
-                    maximized_view = True
-                    if main.focused: main.set_maximized(True)
-                    if devices.focused: devices.set_maximized(True)
-                    if messages.focused: messages.set_maximized(True)
-                    maximized_panel.top()
-                else:
-                    maximized_view = False
-                    if main.focused: main.set_maximized(False)
-                    if devices.focused: devices.set_maximized(False)
-                    if messages.focused: messages.set_maximized(False)
-                    maximized_window.clear()
-                    maximized_panel.bottom()
-                curses.panel.update_panels()
-                screen.refresh()
-            if main.focused: main.handle_key(key)
-            if devices.focused: devices.handle_key(key)
-            if messages.focused: messages.handle_key(key)
-    except GetOutOfLoop as r:
-        if r.message != '':
-            messages.print_error([r.message])
+            try:
+                resized = curses.is_term_resized(max_screen_height, max_screen_width)
+                if resized:
+                    max_screen_height, max_screen_width = screen.getmaxyx()
+                    curses.resize_term(max_screen_height, max_screen_width)
+                    main.resize_window(max_screen_height - 5, int(max_screen_width / 2))
+                    devices.resize_window(max_screen_height - 5, int(max_screen_width / 2))
+                    messages.resize_window(5 , max_screen_width)
+                    maximized_window.resize(max_screen_height, max_screen_width)
+                    screen.refresh()
+                key = maximized_window.getch() if maximized_view else main.window.getch() if main.focused else messages.window.getch() if messages.focused else devices.window.getch()
+                if key == ord('\t'):
+                    if main.focused and not main.maximized:
+                        main.set_focused(False)
+                        devices.set_focused(True)
+                        main.display()
+                    elif devices.focused and not devices.maximized:
+                        devices.set_focused(False)
+                        messages.set_focused(True)
+                        devices.display()
+                    elif messages.focused and not messages.maximized:
+                        messages.set_focused(False)
+                        main.set_focused(True)
+                        messages.display()
+                if key == ord('m'):
+                    if not maximized_view:
+                        maximized_view = True
+                        if main.focused: main.set_maximized(True)
+                        if devices.focused: devices.set_maximized(True)
+                        if messages.focused: messages.set_maximized(True)
+                        maximized_panel.top()
+                    else:
+                        maximized_view = False
+                        if main.focused: main.set_maximized(False)
+                        if devices.focused: devices.set_maximized(False)
+                        if messages.focused: messages.set_maximized(False)
+                        maximized_window.clear()
+                        maximized_panel.bottom()
+                    curses.panel.update_panels()
+                    screen.refresh()
+                if main.focused: main.handle_key(key)
+                if devices.focused: devices.handle_key(key)
+                if messages.focused: messages.handle_key(key)
+            except CodeError as e:
+                messages.print_error([e.message])
+    except GetOutOfLoop:
         messages.print_error(['Pressed exit key (q)', 'Exiting...'])
     except KeyboardInterrupt:
         messages.print_error(['(^C) interrupted'])

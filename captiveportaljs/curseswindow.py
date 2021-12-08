@@ -1,16 +1,13 @@
 import curses, curses.panel
 import threading
-
-class GetOutOfLoop(Exception):
-    def __init__(self, message):
-        self.message = message
-        pass
+from captiveportaljs.errorclasses import GetOutOfLoop
 
 class CursesWindow:
     def __init__(self, window, panel, title, headers, maximized_window, maximized_panel):
         # type: (curses._CursesWindow, curses.panel._Curses_Panel, str, list[str], curses._CursesWindow, curses.panel._Curses_Panel) -> None
         self.title = title
         self.headers = headers
+        if len(self.headers) > 0: self.headers.append(''.ljust(window.getmaxyx()[1] - 2, '-'))
         self.help_shown = False
         self.window = window
         self.maximized_window = maximized_window
