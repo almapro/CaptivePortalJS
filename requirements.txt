@@ -3,3 +3,4 @@ ipaddress
 curses
 pyric
 urwid
+blinker
