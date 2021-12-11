@@ -2,6 +2,7 @@ import os
 import threading
 import curses, curses.panel
 from time import sleep
+from captiveportaljs.core import Core
 from captiveportaljs.curseswindow import CursesWindow
 from captiveportaljs.errorclasses import CodeError, GetOutOfLoop
 from captiveportaljs.network import Network
@@ -34,8 +35,11 @@ def create_window_with_panel(height, width, x, y):
     panel = curses.panel.new_panel(window)
     return window, panel
 
-def run():
+def another_run():
     check_sudo_mode()
+    Core.start()
+
+def run():
     screen = curses.wrapper(curses_wrapper)
     max_screen_height, max_screen_width = screen.getmaxyx()
     maximized_window, maximized_panel = create_window_with_panel(max_screen_height, max_screen_width, 0, 0)

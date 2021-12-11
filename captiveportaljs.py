@@ -8,4 +8,4 @@ except NameError:
     pass
 
 if __name__ == '__main__':
-    runner.run();
+    runner.another_run();
