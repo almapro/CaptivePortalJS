@@ -4,3 +4,4 @@ curses
 pyric
 urwid
 blinker
+asyncio
