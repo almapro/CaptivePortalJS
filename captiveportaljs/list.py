@@ -3,7 +3,8 @@ import urwid
 class List(urwid.ListBox):
     def __init__(self, items, selectable=True):
         self._selectable = selectable
-        super().__init__(ListWalker(items))
+        self.walker = ListWalker(items)
+        super().__init__(self.walker)
 
     def selectable(self):
         return self._selectable
