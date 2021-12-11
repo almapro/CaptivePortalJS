@@ -8,7 +8,7 @@ import scapy.all as scapy
 from ipaddress import IPv4Network
 from typing import Callable
 from captiveportaljs.utils import execute_commands
-from captiveportaljs.curseswindow import CursesWindow
+from captiveportaljs.window import Window
 
 class Network:
     @staticmethod
@@ -60,7 +60,8 @@ class Network:
 
     @staticmethod
     def scanner_thread(window, interface, stop):
-        # type: (CursesWindow, str, Callable) -> None
+        # type: (Window, str, Callable) -> None
+        from captiveportaljs.core import Core
         devices = []
         disconnected_devices = []
         gateway = Network.get_interface_gateway(interface)
@@ -68,9 +69,10 @@ class Network:
         while True:
             try:
                 if stop():
+                    Core.SCANNERS['network'] = False
                     break;
                 scan_result = Network.range_scan(range)[0]
-                window.clear_entries()
+                window.list.walker.clear()
                 new_devices = []
                 for result in scan_result:
                     new_devices.append({ 'ip': result[1].psrc, 'mac': result[1].hwsrc })
@@ -90,15 +92,15 @@ class Network:
                     router = '(Router)' if device['ip'] == gateway else ''
                     if device in reconnected_devices:
                         window.log_info(['Device ({}) reconnected with IP ({})'.format(device['mac'], device['ip'])])
-                        window.print_info(['{} {} (reconnected) {}'.format(device['ip'], device['mac'], router)])
+                        window.entry_good(['{} {} (reconnected) {}'.format(device['ip'], device['mac'], router)])
                     else:
                         window.log_info(['Device ({}) connected with IP ({})'.format(device['mac'], device['ip'])])
-                        window.print_info(['{} {} {}'.format(device['ip'], device['mac'], router)])
+                        window.entry_info(['{} {} {}'.format(device['ip'], device['mac'], router)])
                 for device in disconnected_devices:
                     window.log_info(['Device ({}) disconnected'.format(device['mac'])])
-                    window.print_error(['{} {} (disconnected)'.format(device['ip'], device['mac'])])
-                window.set_title('Devices on network ({})'.format(len(devices)))
-                window.display()
+                    window.entry_warning(['{} {} (disconnected)'.format(device['ip'], device['mac'])])
+                Core.get_context('devices').send('scanner', count=len(devices))
+                Core.set_window_title('devices', 'Devices on network ({})'.format(len(devices)))
                 sleep(3)
             except Exception as e:
                 window.log_error(['{}'.format(e)])
