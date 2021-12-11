@@ -60,17 +60,25 @@ class Window(urwid.Frame):
             self.entry_error(kw['entries'])
 
     def entry_info(self, entries):
+        from captiveportaljs.core import Core
         for entry in entries:
             self.list.walker.append(urwid.AttrMap(ListRow(entry), 'info'))
+            if Core.loop: Core.loop.set_alarm_in(0.01, self.refresh)
 
     def entry_good(self, entries):
+        from captiveportaljs.core import Core
         for entry in entries:
             self.list.walker.append(urwid.AttrMap(ListRow(entry), 'good'))
+            if Core.loop: Core.loop.set_alarm_in(0.01, self.refresh)
 
     def entry_warning(self, entries):
+        from captiveportaljs.core import Core
         for entry in entries:
             self.list.walker.append(urwid.AttrMap(ListRow(entry), 'warning'))
+            if Core.loop: Core.loop.set_alarm_in(0.01, self.refresh)
 
     def entry_error(self, entries):
+        from captiveportaljs.core import Core
         for entry in entries:
             self.list.walker.append(urwid.AttrMap(ListRow(entry), 'error'))
+            if Core.loop: Core.loop.set_alarm_in(0.01, self.refresh)

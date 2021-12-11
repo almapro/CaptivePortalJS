@@ -181,12 +181,8 @@ class Core:
                         window.entry_good(['Disabled'])
                 if window:
                     window.entry_info(['Stopping {} scanner...'.format(scanner)])
-                    if Core.loop:
-                        Core.loop.set_alarm_in(0.01, window.refresh)
                 while Core.SCANNERS[scanner]:
                     await asyncio.sleep(0.5)
                 if window:
                     window.entry_good(['Stopped'])
-                    if Core.loop:
-                        Core.loop.set_alarm_in(0.01, window.refresh)
         raise urwid.ExitMainLoop
