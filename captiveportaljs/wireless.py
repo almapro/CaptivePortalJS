@@ -1,10 +1,12 @@
 # import pyric
+from uuid import uuid4 as v4
 import pyric.pyw as pyw
 from pyric.pyw import Card
 from scapy.layers import dot11
 from scapy.layers.dot11 import Dot11Elt, RadioTap, Dot11Beacon, Dot11ProbeResp
 from typing import Callable
-from captiveportaljs.curseswindow import CursesWindow
+from captiveportaljs.window import Window
+from captiveportaljs.wirelesslist import AccessPointItem
 
 class Wireless:
     @staticmethod
@@ -24,7 +26,8 @@ class Wireless:
 
     @staticmethod
     def scanner_thread(window, interface, stop):
-        # type: (CursesWindow, WirelessInterface, Callable) -> None
+        # type: (Window, WirelessInterface, Callable) -> None
+        from captiveportaljs.core import Core
         enabled_monitor = False
         try:
             enabled_monitor = interface.enable_monitor()
@@ -38,6 +41,7 @@ class Wireless:
                     try:
                         if stop():
                             interface.disable_monitor()
+                            Core.SCANNERS['wireless'] = False
                             break
                         dot11.sniff(iface=interface.monitor_card.dev, prn=Wireless.process_packets, count=5, store=0)
                         new_aps_count = len(Wireless.access_points) + len(Wireless.hidden_access_points)
@@ -49,39 +53,11 @@ class Wireless:
                         if new_aps_count != aps_count or clients_count != new_clients_count:
                             aps_count = new_aps_count
                             clients_count = new_clients_count
-                            window.clear_entries()
-                            essid_width = window.window.getmaxyx()[1] - 2 - 19 - 5 - 13 - 5 - 4;
-                            for access_point in Wireless.access_points:
-                                encryption = '{} ({})'.format(access_point.encryption, access_point.cipher) if access_point.cipher else access_point.encryption
-                                window.print_info([
-                                    '{}{}{}{}{}{}'.format(
-                                        access_point.essid.ljust(essid_width),
-                                        access_point.bssid.ljust(19),
-                                        str(access_point.channel).ljust(5),
-                                        encryption.ljust(13),
-                                        str(access_point.signal_strength).ljust(5),
-                                        'YES' if access_point.wps else 'NO',
-                                    )
-                                ])
-                                for client in access_point.clients:
-                                    window.print_info(['    {}'.format(client)])
-                            for access_point in Wireless.hidden_access_points:
-                                encryption = '{} ({})'.format(access_point.encryption, access_point.cipher) if access_point.cipher else access_point.encryption
-                                window.print_info([
-                                    '{}{}{}{}{}{}'.format(
-                                        '{} (hidden)'.format(access_point.essid).ljust(essid_width - 9),
-                                        access_point.bssid.ljust(19),
-                                        str(access_point.channel).ljust(5),
-                                        encryption.ljust(13),
-                                        str(access_point.signal_strength).ljust(5),
-                                        'YES' if access_point.wps else 'NO',
-                                    )
-                                ])
-                                for client in access_point.clients:
-                                    window.print_info(['    {}'.format(client)])
+                            Core.get_context('wireless').send('scanner', count=[aps_count, clients_count])
+                            Core.set_window_title('wireless', 'Wireless Access Points/Stations ({}/{})'.format(aps_count, clients_count))
                     except Exception as e:
                         window.log_warning(['{}'.format(e)])
-                    window.display()
+                    window.refresh()
 
     access_points = [] # type: list[AccessPoint]
     hidden_access_points = [] # type: list[AccessPoint]
@@ -108,6 +84,7 @@ class Wireless:
     @staticmethod
     def create_ap_from_packet(packet):
         # type: (RadioTap) -> None
+        from captiveportaljs.core import Core
         elt_section = packet[Dot11Elt]
         try:
             channel = 1
@@ -146,10 +123,15 @@ class Wireless:
                 access_point.set_wps(wps)
                 access_point.set_cipher(cipher)
                 access_point.set_suite(suite)
+                Core.get_context('wireless').send('{}-changed'.format(access_point.id))
                 return None
-        access_point = AccessPoint(essid, bssid, channel, encryption, wps, cipher, suite)
-        access_point.set_signal_strength(new_signal_strength)
+        access_point = AccessPoint(essid, bssid, channel, encryption, new_signal_strength, wps, cipher, suite)
         Wireless.access_points.append(access_point)
+        window = Core.get_window('wireless')
+        if window:
+            window.entry_info([
+                AccessPointItem(access_point)
+            ])
 
     @staticmethod
     def find_encryption_from_packet(
@@ -201,20 +183,20 @@ class Wireless:
     def get_rssi(non_decoded_packet):
         # type: (RadioTap) -> int
         try:
-            return -(256 - ord(non_decoded_packet[-6:-5]))
-            # return -(256 - max(ord(non_decoded_packet[-4:-3]), ord(non_decoded_packet[-2:-1])))
+            # return -(256 - ord(non_decoded_packet[-6:-5]))
+            return -(256 - max(ord(non_decoded_packet[-4:-3]), ord(non_decoded_packet[-2:-1])))
         except TypeError:
             return -100
 
     @staticmethod
     def calculate_signal_strength(rssi):
         # type: (int) -> int
-        signal_strength = 0
-        if rssi >= -50:
-            signal_strength = 100
-        else:
-            signal_strength = 2 * (rssi + 100)
-        return signal_strength
+        # signal_strength = 0
+        # if rssi >= -50:
+        #     signal_strength = 100
+        # else:
+        #     signal_strength = 2 * (rssi + 100)
+        return rssi
 
     @staticmethod
     def find_clients_from_packet(packet):
@@ -284,8 +266,9 @@ class WirelessInterface:
         return True
 
 class AccessPoint(object):
-    def __init__(self, essid, bssid, channel, encryption, wps, cipher, suite):
-        # type: (str, str, int, str, bool, str, str) -> None
+    def __init__(self, essid, bssid, channel, encryption, signal_strength, wps, cipher, suite):
+        # type: (str, str, int, str, int, bool, str, str) -> None
+        self.id = str(v4())
         self.essid = essid
         self.bssid = bssid
         self.channel = channel
@@ -293,7 +276,7 @@ class AccessPoint(object):
         self.wps = wps
         self.cipher = cipher
         self.suite = suite
-        self.signal_strength = 0
+        self.signal_strength = signal_strength
         self.clients = []
 
     def set_channel(self, channel):
@@ -321,7 +304,9 @@ class AccessPoint(object):
         self.signal_strength = strength
 
     def add_client(self, client):
+        from captiveportaljs.core import Core
         # type: (str) -> None
         if not client in ['01:80:c2:00:00:00', '00:00:00:00:00:00', 'ff:ff:ff:ff:ff:ff', None] and not client.startswith('01:00:5e:') and not client.startswith('33:33:'):
             if client not in self.clients:
                 self.clients.append(client)
+                Core.get_context('wireless').send('{}-changed'.format(self.id))
