@@ -1,13 +1,9 @@
 import urwid
 
 class List(urwid.ListBox):
-    def __init__(self, items, selectable=True):
-        self._selectable = selectable
+    def __init__(self, items):
         self.walker = ListWalker(items)
         super().__init__(self.walker)
-
-    def selectable(self):
-        return self._selectable
 
 class ListWalker(urwid.SimpleFocusListWalker):
     def __init__(self, content):
