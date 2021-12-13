@@ -1,18 +1,25 @@
 import urwid
+from uuid import uuid4 as v4
 from captiveportaljs.list import List, ListRow
 
 class Window(urwid.Frame):
-    def __init__(self, headers, items, selectable=True):
+    def __init__(self, headers, items):
         self.headers = []
         viewItems = []
         if len(headers):
             for header in headers:
-                self.headers.append(urwid.Text(header))
+                if isinstance(header, str):
+                    self.headers.append(urwid.Text(header))
+                else:
+                    self.headers.append(header)
             self.headers.append(urwid.Divider('-'))
         for item in items:
             viewItems.append(item)
-        self.list = List(viewItems, selectable)
+        self.list = List(viewItems)
         super().__init__(self.list)
+
+    def selectable(self):
+        return True
 
     def refresh(self, *_):
         self.body = urwid.AttrMap(self.list, '')
@@ -62,23 +69,46 @@ class Window(urwid.Frame):
     def entry_info(self, entries):
         from captiveportaljs.core import Core
         for entry in entries:
-            self.list.walker.append(urwid.AttrMap(ListRow(entry), 'info'))
+            if isinstance(entry, str):
+                item = ListRow(entry)
+            else:
+                item = entry
+            item.id = str(v4())
+            self.list.walker.append(urwid.AttrMap(item, 'info', focus_map='item_hover'))
             if Core.loop: Core.loop.set_alarm_in(0.01, self.refresh)
 
     def entry_good(self, entries):
         from captiveportaljs.core import Core
         for entry in entries:
-            self.list.walker.append(urwid.AttrMap(ListRow(entry), 'good'))
+            item = ListRow(entry)
+            if isinstance(entry, str):
+                item = ListRow(entry)
+            else:
+                item = entry
+            item.id = str(v4())
+            self.list.walker.append(urwid.AttrMap(item, 'good', focus_map='item_hover'))
             if Core.loop: Core.loop.set_alarm_in(0.01, self.refresh)
 
     def entry_warning(self, entries):
         from captiveportaljs.core import Core
         for entry in entries:
-            self.list.walker.append(urwid.AttrMap(ListRow(entry), 'warning'))
+            item = ListRow(entry)
+            if isinstance(entry, str):
+                item = ListRow(entry)
+            else:
+                item = entry
+            item.id = str(v4())
+            self.list.walker.append(urwid.AttrMap(item, 'warning', focus_map='item_hover'))
             if Core.loop: Core.loop.set_alarm_in(0.01, self.refresh)
 
     def entry_error(self, entries):
         from captiveportaljs.core import Core
         for entry in entries:
-            self.list.walker.append(urwid.AttrMap(ListRow(entry), 'error'))
+            item = ListRow(entry)
+            if isinstance(entry, str):
+                item = ListRow(entry)
+            else:
+                item = entry
+            item.id = str(v4())
+            self.list.walker.append(urwid.AttrMap(item, 'error', focus_map='item_hover'))
             if Core.loop: Core.loop.set_alarm_in(0.01, self.refresh)
