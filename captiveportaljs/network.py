@@ -7,6 +7,8 @@ from time import sleep
 import scapy.all as scapy
 from ipaddress import IPv4Network
 from typing import Callable
+
+import urwid
 from captiveportaljs.utils import execute_commands
 from captiveportaljs.window import Window
 
@@ -92,15 +94,28 @@ class Network:
                     router = '(Router)' if device['ip'] == gateway else ''
                     if device in reconnected_devices:
                         window.log_info(['Device ({}) reconnected with IP ({})'.format(device['mac'], device['ip'])])
-                        window.entry_good(['{} {} (reconnected) {}'.format(device['ip'], device['mac'], router)])
+                        window.entry_good([
+                            urwid.Columns([
+                                urwid.Text(device['ip']),
+                                urwid.Text(device['mac']),
+                                urwid.Text('(reconnected) {}'.format(router)),
+                            ]),
+                        ])
                     else:
                         window.log_info(['Device ({}) connected with IP ({})'.format(device['mac'], device['ip'])])
-                        window.entry_info(['{} {} {}'.format(device['ip'], device['mac'], router)])
+                        window.entry_info([
+                            urwid.Columns([
+                                urwid.Text(device['ip']),
+                                urwid.Text(device['mac']),
+                                urwid.Text(router),
+                            ]),
+                        ])
                 for device in disconnected_devices:
                     window.log_info(['Device ({}) disconnected'.format(device['mac'])])
                     window.entry_warning(['{} {} (disconnected)'.format(device['ip'], device['mac'])])
                 Core.get_context('devices').send('scanner', count=len(devices))
                 Core.set_window_title('devices', 'Devices on network ({})'.format(len(devices)))
+                if Core.loop: Core.loop.set_alarm_in(0.01, window.refresh)
                 sleep(3)
             except Exception as e:
                 window.log_error(['{}'.format(e)])
