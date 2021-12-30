@@ -6,6 +6,7 @@ from captiveportaljs.network import Network
 from captiveportaljs.window import Window
 from captiveportaljs.statusbar import StatusBar
 from captiveportaljs.wireless import Wireless, WirelessInterface
+from captiveportaljs.wireless.window import WirelessWindow
 
 class Core:
     PALETTE = [
@@ -15,7 +16,7 @@ class Core:
         ('statusbar_info', 'black', 'light cyan'),
         ('statusbar_good', 'black', 'light green'),
         ('statusbar_warning', 'black', 'yellow'),
-        ('statusbar_error', 'black', 'dark red'),
+        ('statusbar_error', 'white', 'dark red'),
         ('info', 'light cyan', ''),
         ('good', 'light green', ''),
         ('warning', 'yellow', ''),
@@ -52,7 +53,7 @@ class Core:
             ]),
         ], [])
         Core.set_window('devices', devices, 'Devices on network (0)')
-        wireless = Window([
+        wireless = WirelessWindow([
             urwid.Columns([
                 urwid.Text('ESSID'),
                 urwid.Text('BSSID'),
@@ -62,7 +63,7 @@ class Core:
                 urwid.Text('WPS'),
                 urwid.Text('CLIENTS'),
             ]),
-        ], [])
+        ])
         Core.set_window('wireless', wireless, 'Wireless Access Points/Stations (0/0)')
         messages = Window([], [])
         Core.set_window('messages', messages, 'Messages')
@@ -108,7 +109,8 @@ class Core:
         Core.loop = urwid.MainLoop(linebox, event_loop=urwid.AsyncioEventLoop(loop=loop), unhandled_input=Core.keypress, palette=Core.PALETTE)
         try:
             Core.loop.run()
-        except:
+        except Exception as e:
+            print(e)
             asyncio.run(Core.exit_from_core())
         if networking_scanner and Core.SCANNERS['network']:
             networking_scanner.join()

@@ -16,6 +16,7 @@ class Window(urwid.Frame):
         for item in items:
             viewItems.append(item)
         self.list = List(viewItems)
+        self.index = 0
         super().__init__(self.list)
 
     def selectable(self):
